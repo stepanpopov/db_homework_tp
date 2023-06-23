@@ -160,6 +160,21 @@ func (repo Repo) ForumGetBySlug(slug string) (models.Forum, error) {
 }
 
 func (repo Repo) ForumGetUsers(slug string, sinceUser *string, desc bool, limit int32) (models.Users, error) {
+	var forumExists bool
+	repo.db.QueryRow(ctx, fmt.Sprintf(
+		`SELECT EXISTS(
+			SELECT 1
+			FROM forums
+			WHERE slug = '%s'
+			LIMIT 1)`, slug),
+	).Scan(
+		&forumExists,
+	)
+
+	if !forumExists {
+		return nil, models.ErrNotFound
+	}
+
 	orderParam := "DESC"
 	cmpParam := "<"
 	if !desc {
@@ -196,23 +211,6 @@ func (repo Repo) ForumGetUsers(slug string, sinceUser *string, desc bool, limit 
 	rows, _ := repo.db.Query(ctx, query)
 	defer rows.Close()
 
-	if len(rows.RawValues()) == 0 {
-		var forumExists bool
-		repo.db.QueryRow(ctx, fmt.Sprintf(
-			`SELECT EXISTS(
-				SELECT 1
-				FROM forums
-				WHERE slug = '%s'
-			 	LIMIT 1)`, slug),
-		).Scan(
-			&forumExists,
-		)
-
-		if !forumExists {
-			return nil, models.ErrNotFound
-		}
-	}
-
 	users := make(models.Users, 0)
 	for rows.Next() {
 		var user models.User
@@ -230,6 +228,23 @@ func (repo Repo) ForumGetUsers(slug string, sinceUser *string, desc bool, limit 
 }
 
 func (r Repo) ForumGetThreads(forumSlug string, sinceTime *time.Time, desc bool, limit int32) (models.Threads, error) {
+
+	var forumExists bool
+	r.db.QueryRow(ctx, fmt.Sprintf(
+		`SELECT EXISTS(
+			SELECT 1
+			FROM forums
+			WHERE slug = '%s'
+			LIMIT 1)`, forumSlug),
+	).Scan(
+		&forumExists,
+	)
+
+	if !forumExists {
+		return nil, models.ErrNotFound
+	}
+
+
 	orderParam := "DESC"
 	cmpParam := "<="
 	if !desc {
@@ -274,24 +289,6 @@ func (r Repo) ForumGetThreads(forumSlug string, sinceTime *time.Time, desc bool,
 	}
 
 	defer rows.Close()
-
-	if len(rows.RawValues()) == 0 {
-		var forumExists bool
-		r.db.QueryRow(ctx, fmt.Sprintf(
-			`SELECT EXISTS(
-				SELECT 1
-				FROM forums
-				WHERE slug = '%s'
-			 	LIMIT 1)`, forumSlug),
-		).Scan(
-			&forumExists,
-		)
-
-		if !forumExists {
-			return nil, models.ErrNotFound
-		}
-	}
-
 	threads := make(models.Threads, 0)
 	for rows.Next() {
 		var thread models.Thread

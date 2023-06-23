@@ -16,7 +16,7 @@ CREATE UNLOGGED TABLE IF NOT EXISTS forums
     slug           CITEXT                    PRIMARY KEY,
     title          TEXT                      NOT NULL,
     threads        INTEGER                   NOT NULL DEFAULT 0,
-    posts          BIGINT                    NOT NULL DEFAULT 0,
+    posts          INTEGER                   NOT NULL DEFAULT 0,
     owner_nickname CITEXT                    NOT NULL,
 
     FOREIGN KEY (owner_nickname) REFERENCES users (nickname) 
@@ -61,14 +61,14 @@ CREATE UNLOGGED TABLE IF NOT EXISTS votes
 CREATE UNLOGGED TABLE IF NOT EXISTS posts
 (
     id              BIGSERIAL PRIMARY KEY,
-    thread_id       INTEGER                                               NOT NULL,
+    thread_id       INT                                                   NOT NULL,
     author_nickname CITEXT                                                NOT NULL,
     forum_slug      CITEXT                                                NOT NULL,
     is_edited       BOOLEAN                     DEFAULT FALSE             NOT NULL,
     message         TEXT                                                  NOT NULL,
-    parent          BIGINT                                                ,  -- mmmm
+    parent          INT                                                ,  -- mmmm
     created         TIMESTAMP(3) WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    path            BIGINT[]                                              NOT NULL,
+    path            INTEGER[]                                              NOT NULL,
 
     FOREIGN KEY (author_nickname) REFERENCES users (nickname)  -- BINGO
 );
@@ -184,7 +184,7 @@ EXECUTE PROCEDURE increment_forum_posts();
 CREATE OR REPLACE FUNCTION add_path_to_post() RETURNS TRIGGER AS
 $add_path_to_post$
 DECLARE
-    parent_path BIGINT[];
+    parent_path INTEGER[];
 BEGIN
     IF NEW.parent IS NULL THEN
         NEW.path := NEW.path || NEW.id;
@@ -214,25 +214,24 @@ CREATE TRIGGER add_path_to_post
     FOR EACH ROW
 EXECUTE PROCEDURE add_path_to_post();
 
--- 
 
+CREATE INDEX IF NOT EXISTS users_nickname_index ON users USING hash (nickname);
+CREATE INDEX IF NOT EXISTS users_email_index ON users USING hash (email);
+CREATE INDEX IF NOT EXISTS forum_slug_index ON forums USING hash (slug);
+CREATE INDEX IF NOT EXISTS thread_slug_index ON threads USING hash (slug);
+CREATE INDEX IF NOT EXISTS thread_id_index ON threads USING hash (id);
+CREATE INDEX IF NOT EXISTS post_id_index ON posts USING hash (id);
+
+--
 CREATE INDEX IF NOT EXISTS posts_thread_id_path1_id_idx ON posts (thread_id, (path[1]), id);
-
-CREATE INDEX IF NOT EXISTS posts_thread_id_path_idx ON posts (thread_id, path);
-
-CREATE INDEX IF NOT EXISTS posts_thread_id_id_idx ON posts (thread_id, id);
-
+CREATE INDEX IF NOT EXISTS posts_thread_id_path_idx ON posts (thread_id, path, id);
 CREATE INDEX IF NOT EXISTS posts_thread_id_parent_path_idx ON posts (thread_id, parent, path);
-
 CREATE INDEX IF NOT EXISTS posts_parent_id_idx ON posts (parent, id);
-
 CREATE INDEX IF NOT EXISTS posts_id_created_thread_id_idx ON posts (id, created, thread_id);
+CREATE INDEX IF NOT EXISTS posts_id_path_idx ON posts (id, path);
+--
 
 CREATE INDEX IF NOT EXISTS threads_forum_slug_created_idx ON threads (forum_slug, created);
-
-CREATE INDEX IF NOT EXISTS posts_id_path_idx ON posts (id, path);
-
-CREATE INDEX IF NOT EXISTS users_nickname_email_include_other_idx ON users (nickname, email) INCLUDE (about, fullname);
 
 ANALYZE;
 VACUUM FULL;
