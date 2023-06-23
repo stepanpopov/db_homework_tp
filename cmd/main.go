@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	// load environment
 
 	db "github.com/stepanpopov/db_homework_tp/cmd/init/db"
 	router "github.com/stepanpopov/db_homework_tp/cmd/init/router"

@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS CITEXT;
 
 CREATE UNLOGGED TABLE IF NOT EXISTS users
 (
-    nickname CITEXT COLLATE ucs_basic PRIMARY KEY UNIQUE NOT NULL,
+    nickname CITEXT COLLATE ucs_basic                   PRIMARY KEY,
     email    CITEXT UNIQUE                               NOT NULL,
     fullname TEXT                                        NOT NULL,
     about    TEXT                                        NOT NULL
@@ -13,15 +13,13 @@ CREATE UNLOGGED TABLE IF NOT EXISTS users
 
 CREATE UNLOGGED TABLE IF NOT EXISTS forums
 (
-    slug           CITEXT PRIMARY KEY UNIQUE NOT NULL,
+    slug           CITEXT                    PRIMARY KEY,
     title          TEXT                      NOT NULL,
     threads        INTEGER                   NOT NULL DEFAULT 0,
     posts          BIGINT                    NOT NULL DEFAULT 0,
     owner_nickname CITEXT                    NOT NULL,
 
-    FOREIGN KEY (owner_nickname) REFERENCES users (nickname)  -- MAYBE DELETE
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    FOREIGN KEY (owner_nickname) REFERENCES users (nickname) 
 );
 
 CREATE UNLOGGED TABLE IF NOT EXISTS forums_users_nicknames
@@ -29,15 +27,7 @@ CREATE UNLOGGED TABLE IF NOT EXISTS forums_users_nicknames
     forum_slug    CITEXT                   NOT NULL,
     user_nickname CITEXT COLLATE ucs_basic NOT NULL,
 
-    FOREIGN KEY (forum_slug) REFERENCES forums (slug)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-    FOREIGN KEY (user_nickname) REFERENCES users (nickname)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-
-    UNIQUE (forum_slug, user_nickname),
-    CONSTRAINT forums_users_nicknames_pk PRIMARY KEY (forum_slug, user_nickname)
+    PRIMARY KEY (forum_slug, user_nickname)
 );
 
 CREATE VIEW forums_users AS
@@ -47,21 +37,14 @@ FROM forums_users_nicknames AS fu_nicknames
 
 CREATE UNLOGGED TABLE IF NOT EXISTS threads
 (
-    id              SERIAL PRIMARY KEY UNIQUE                             NOT NULL,
+    id              SERIAL PRIMARY KEY,
     slug            CITEXT UNIQUE,
     forum_slug      CITEXT                                                NOT NULL,
     author_nickname CITEXT                                                NOT NULL,
     title           TEXT                                                  NOT NULL,
     message         TEXT                                                  NOT NULL,
     votes           INTEGER                     DEFAULT 0                 NOT NULL,
-    created         TIMESTAMP(3) WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-
-    FOREIGN KEY (forum_slug) REFERENCES forums (slug)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-    FOREIGN KEY (author_nickname) REFERENCES users (nickname)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
+    created         TIMESTAMP(3) WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE UNLOGGED TABLE IF NOT EXISTS votes
@@ -70,20 +53,14 @@ CREATE UNLOGGED TABLE IF NOT EXISTS votes
     author_nickname CITEXT   NOT NULL,
     voice           SMALLINT NOT NULL,
 
-    FOREIGN KEY (thread_id) REFERENCES threads (id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-    FOREIGN KEY (author_nickname) REFERENCES users (nickname)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
+    FOREIGN KEY (author_nickname) REFERENCES users (nickname),
 
-    UNIQUE (thread_id, author_nickname),
-    CONSTRAINT votes_pk PRIMARY KEY (thread_id, author_nickname)
+    PRIMARY KEY (thread_id, author_nickname)
 );
 
 CREATE UNLOGGED TABLE IF NOT EXISTS posts
 (
-    id              BIGSERIAL PRIMARY KEY UNIQUE                          NOT NULL,
+    id              BIGSERIAL PRIMARY KEY,
     thread_id       INTEGER                                               NOT NULL,
     author_nickname CITEXT                                                NOT NULL,
     forum_slug      CITEXT                                                NOT NULL,
@@ -93,15 +70,7 @@ CREATE UNLOGGED TABLE IF NOT EXISTS posts
     created         TIMESTAMP(3) WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     path            BIGINT[]                                              NOT NULL,
 
-    FOREIGN KEY (thread_id) REFERENCES threads (id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
     FOREIGN KEY (author_nickname) REFERENCES users (nickname)  -- BINGO
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-    FOREIGN KEY (forum_slug) REFERENCES forums (slug)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
 );
 
 -- Triggers and procedures
@@ -228,8 +197,7 @@ BEGIN
 
         IF (COALESCE(ARRAY_LENGTH(parent_path, 1), 0) = 0) THEN
             RAISE EXCEPTION
-                'parent post with id=% not exists in thread with id=%',
-                NEW.parent, NEW.thread_id;
+                'parent post not exists';
         END IF;
 
         NEW.path := NEW.path || parent_path || NEW.id;
@@ -246,51 +214,25 @@ CREATE TRIGGER add_path_to_post
     FOR EACH ROW
 EXECUTE PROCEDURE add_path_to_post();
 
---
--- TODO(nickeskov): maybe use this trigger for update is edited
--- CREATE OR REPLACE FUNCTION update_is_edited_in_post() RETURNS TRIGGER AS
--- $update_is_edited_in_post$
--- BEGIN
---     IF (OLD.is_edited = FALSE) AND (NEW.message IS NOT NULL) AND (OLD.message <> NEW.message) THEN
---         NEW.is_edited = TRUE;
---     END IF;
---     RETURN NEW;
--- END;
--- $update_is_edited_in_post$ LANGUAGE plpgsql;
---
---
--- DROP TRIGGER IF EXISTS update_is_edited_in_post ON posts CASCADE;
---
--- CREATE TRIGGER update_is_edited_in_post
---     BEFORE UPDATE
---     ON posts
---     FOR EACH ROW
--- EXECUTE PROCEDURE update_is_edited_in_post();
+-- 
 
---
+CREATE INDEX IF NOT EXISTS posts_thread_id_path1_id_idx ON posts (thread_id, (path[1]), id);
 
--- Indexes
+CREATE INDEX IF NOT EXISTS posts_thread_id_path_idx ON posts (thread_id, path);
 
--- CREATE INDEX IF NOT EXISTS posts_thread_id_path1_id_idx ON posts (thread_id, (path[1]), id);
+CREATE INDEX IF NOT EXISTS posts_thread_id_id_idx ON posts (thread_id, id);
 
--- CREATE INDEX IF NOT EXISTS posts_thread_id_path_idx ON posts (thread_id, path);
+CREATE INDEX IF NOT EXISTS posts_thread_id_parent_path_idx ON posts (thread_id, parent, path);
 
--- CREATE INDEX IF NOT EXISTS posts_thread_id_id_idx ON posts (thread_id, id);
+CREATE INDEX IF NOT EXISTS posts_parent_id_idx ON posts (parent, id);
 
--- CREATE INDEX IF NOT EXISTS posts_thread_id_parent_path_idx ON posts (thread_id, parent, path);
+CREATE INDEX IF NOT EXISTS posts_id_created_thread_id_idx ON posts (id, created, thread_id);
 
--- CREATE INDEX IF NOT EXISTS posts_parent_id_idx ON posts (parent, id);
+CREATE INDEX IF NOT EXISTS threads_forum_slug_created_idx ON threads (forum_slug, created);
 
--- CREATE INDEX IF NOT EXISTS posts_id_created_thread_id_idx ON posts (id, created, thread_id);
+CREATE INDEX IF NOT EXISTS posts_id_path_idx ON posts (id, path);
 
--- CREATE INDEX IF NOT EXISTS threads_forum_slug_created_idx ON threads (forum_slug, created);
-
--- CREATE INDEX IF NOT EXISTS posts_id_path_idx ON posts (id, path);
-
---CREATE INDEX IF NOT EXISTS users_nickname_email_include_other_idx ON users (nickname, email)
---    INCLUDE (about, fullname);
-
---
+CREATE INDEX IF NOT EXISTS users_nickname_email_include_other_idx ON users (nickname, email) INCLUDE (about, fullname);
 
 ANALYZE;
 VACUUM FULL;

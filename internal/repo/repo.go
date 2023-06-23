@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stepanpopov/db_homework_tp/internal/models"
@@ -600,12 +599,6 @@ func (r Repo) PostsCreate(slugOrID string, posts models.Posts) (models.Posts, er
 			batchResults.Close()
 			tx.Rollback(ctx) // TEST
 
-			if pqError, ok := err.(*pgconn.PgError); ok {
-				fmt.Println(pqError.Code)
-			} else {
-				fmt.Println("NOT PgError")
-			}
-
 			return nil, utils.PGErr(err)
 		}
 
@@ -893,7 +886,7 @@ func (r Repo) PostsGetFull(id int, related []string) (models.PostFullInfo, error
 					FROM forums
 					WHERE slug = '%s'
 					LIMIT 1`, post.Forum)
-		
+
 			var forum models.Forum
 			con.QueryRow(context.Background(), query).Scan(
 				&forum.Slug,
@@ -932,7 +925,7 @@ func (r Repo) PostsGetFull(id int, related []string) (models.PostFullInfo, error
 				&thread.Created,
 			)
 			postFull.Thread = &thread
-	
+
 		case "user":
 			query := fmt.Sprintf(`SELECT nickname, fullname, about, email 
 						  FROM Users
@@ -944,7 +937,6 @@ func (r Repo) PostsGetFull(id int, related []string) (models.PostFullInfo, error
 		}
 
 	}
-
 
 	return postFull, nil
 }
