@@ -89,14 +89,14 @@ CREATE UNLOGGED TABLE IF NOT EXISTS posts
     forum_slug      CITEXT                                                NOT NULL,
     is_edited       BOOLEAN                     DEFAULT FALSE             NOT NULL,
     message         TEXT                                                  NOT NULL,
-    parent          BIGINT,
+    parent          BIGINT                                                ,  -- mmmm
     created         TIMESTAMP(3) WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     path            BIGINT[]                                              NOT NULL,
 
     FOREIGN KEY (thread_id) REFERENCES threads (id)
         ON DELETE CASCADE
         ON UPDATE CASCADE,
-    FOREIGN KEY (author_nickname) REFERENCES users (nickname)
+    FOREIGN KEY (author_nickname) REFERENCES users (nickname)  -- BINGO
         ON DELETE CASCADE
         ON UPDATE CASCADE,
     FOREIGN KEY (forum_slug) REFERENCES forums (slug)
@@ -229,7 +229,7 @@ BEGIN
         IF (COALESCE(ARRAY_LENGTH(parent_path, 1), 0) = 0) THEN
             RAISE EXCEPTION
                 'parent post with id=% not exists in thread with id=%',
-                NEW.ID, NEW.thread_id;
+                NEW.parent, NEW.thread_id;
         END IF;
 
         NEW.path := NEW.path || parent_path || NEW.id;

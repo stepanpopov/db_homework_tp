@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	// load environment
 
@@ -15,8 +14,8 @@ import (
 const (
 	endpoint = ":5000"
 	// maxHeaderBytesHTTP = 1 << 20
-	readTimeoutHTTP  = 10 * time.Second
-	writeTimeoutHTTP = 10 * time.Second
+	// readTimeoutHTTP  = 10 * time.Second
+	// writeTimeoutHTTP = 10 * time.Second
 )
 
 func main() {
@@ -32,8 +31,8 @@ func main() {
 		Handler: router,
 		Addr:    endpoint,
 		// MaxHeaderBytes: maxHeaderBytesHTTP,
-		ReadTimeout:  readTimeoutHTTP,
-		WriteTimeout: writeTimeoutHTTP,
+		// ReadTimeout:  readTimeoutHTTP,
+		// WriteTimeout: writeTimeoutHTTP,
 	}
 
 	if err := httpServer.ListenAndServe(); err != nil {

@@ -37,7 +37,6 @@ RUN echo "host all  all    all  trust" >> /etc/postgresql/$PGVER/main/pg_hba.con
 
 USER root
 
-# VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 
 EXPOSE 5432
 EXPOSE 5000

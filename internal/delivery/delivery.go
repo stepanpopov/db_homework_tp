@@ -2,6 +2,9 @@ package delivery
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/mailru/easyjson"
@@ -90,7 +93,7 @@ func (h *Handler) ForumGetBySlug(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
 	f, err := h.repo.ForumGetBySlug(slug)
-	if  err != nil {
+	if err != nil {
 		utils.ErrorResponse(w, 404)
 		return
 	}
@@ -102,13 +105,38 @@ func (h *Handler) ForumGetUsers(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	since, desc, limit := utils.URLParamsForGetAll(r.URL.Query())
 
-	users, err := h.repo.ForumGetUsers(slug, since, desc, int32(limit))
+	var sinceUser *string
+	if since != "" {
+		sinceUser = &since
+	}
+
+	users, err := h.repo.ForumGetUsers(slug, sinceUser, desc, int32(limit))
 	if err != nil {
 		utils.ErrorResponse(w, 404)
 		return
 	}
 
 	utils.Response(w, 200, users)
+}
+
+func (h *Handler) ForumGetThreads(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	since, desc, limit := utils.URLParamsForGetAll(r.URL.Query())
+
+	var sinceTime *time.Time
+
+	sinceTimeParsed, err := time.Parse(time.RFC3339, since)
+	if err == nil {
+		sinceTime = &sinceTimeParsed
+	}
+
+	threads, err := h.repo.ForumGetThreads(slug, sinceTime, desc, int32(limit))
+	if err != nil {
+		utils.ErrorResponse(w, 404)
+		return
+	}
+
+	utils.Response(w, 200, threads)
 }
 
 // -- THREAD --
@@ -129,12 +157,139 @@ func (h *Handler) ThreadCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	utils.Response(w, 201, thr)
 }
 
+func (h *Handler) ThreadGet(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
 
-// -- SERVICE 
+	thr, err := h.repo.ThreadGet(slug)
+	if err != nil {
+		utils.ErrorResponse(w, 404)
+		return
+	}
+
+	utils.Response(w, 200, thr)
+}
+
+func (h *Handler) ThreadUpdate(w http.ResponseWriter, r *http.Request) {
+	slugOrID := chi.URLParam(r, "slug")
+
+	var thread models.Thread
+	easyjson.UnmarshalFromReader(r.Body, &thread)
+	if id, err := strconv.Atoi(slugOrID); err != nil {
+		thread.Slug = slugOrID
+	} else {
+		thread.ID = int32(id)
+	}
+
+	thr, err := h.repo.ThreadUpdate(thread)
+	if err != nil {
+		utils.ErrorResponse(w, 404)
+		return
+	}
+
+	utils.Response(w, 200, thr)
+}
+
+func (h *Handler) ThreadVote(w http.ResponseWriter, r *http.Request) {
+	slugOrID := chi.URLParam(r, "slug")
+
+	var vote models.Vote
+	easyjson.UnmarshalFromReader(r.Body, &vote)
+
+	thr, err := h.repo.ThreadVote(slugOrID, vote)
+	if err != nil {
+		utils.ErrorResponse(w, 404)
+		return
+	}
+
+	utils.Response(w, 200, thr)
+}
+
+// -- POST --
+func (h *Handler) PostsCreate(w http.ResponseWriter, r *http.Request) {
+	slugOrID := chi.URLParam(r, "slug")
+
+	var posts models.Posts
+	easyjson.UnmarshalFromReader(r.Body, &posts)
+
+	newPosts, err := h.repo.PostsCreate(slugOrID, posts)
+	if err != nil {
+		if err == models.ErrNotFound {
+			utils.ErrorResponse(w, 404)
+			return
+		} else if err == models.ErrRaiseEx {
+			utils.ErrorResponse(w, 409)
+			return
+		}
+
+		utils.ErrorResponse(w, 500)
+	}
+
+	utils.Response(w, 201, newPosts)
+}
+
+func (h *Handler) PostUpdate(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	var post models.Post
+	easyjson.UnmarshalFromReader(r.Body, &post)
+	post.ID, _ = strconv.ParseInt(id, 10, 64)
+
+	newPost, err := h.repo.PostUpdate(post)
+	if err != nil {
+		utils.ErrorResponse(w, 404)
+		return
+	}
+
+	utils.Response(w, 200, newPost)
+}
+
+func (h *Handler) PostsGetSorted(w http.ResponseWriter, r *http.Request) {
+	slugOrID := chi.URLParam(r, "slug")
+
+	URLValues := r.URL.Query()
+	sort := URLValues.Get("sort")
+	since, desc, limit := utils.URLParamsForGetAll(URLValues)
+
+	var sincePost *int
+	if since != "" {
+		sincePostParsed, _ := strconv.Atoi(since)
+		sincePost = &sincePostParsed
+	}
+
+	posts, err := h.repo.PostsGetSorted(slugOrID, sincePost, sort, desc, int32(limit))
+	if err != nil {
+		utils.ErrorResponse(w, 404)
+		return
+	}
+
+	utils.Response(w, 200, posts)
+}
+
+func (h *Handler) PostGetFull(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	id, _ := strconv.Atoi(idParam)
+
+	relatedQuery := r.URL.Query().Get("related")
+
+	var related []string
+	if relatedQuery != "" {
+		related = strings.Split(relatedQuery, ",")
+	}
+
+	posts, err := h.repo.PostsGetFull(id, related)
+	if err != nil {
+		utils.ErrorResponse(w, 404)
+		return
+	}
+
+	utils.Response(w, 200, posts)
+}
+
+// -- SERVICE --
 
 func (h *Handler) ServiceStatus(w http.ResponseWriter, r *http.Request) {
 	status := h.repo.GetStatus()

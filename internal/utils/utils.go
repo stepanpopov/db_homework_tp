@@ -15,10 +15,13 @@ func PGErr(err error) error {
 	if pqError, ok := err.(*pgconn.PgError); ok {
 		switch pqError.Code {
 		case "23503": // foreign key
+			fallthrough
 		case "23502": // null
 			return models.ErrNotFound
 		case "23505": // unique constraint
 			return models.ErrExists
+		case "P0001":
+			return models.ErrRaiseEx
 		default:
 			return models.ErrInternal
 		}

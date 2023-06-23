@@ -30,7 +30,26 @@ func Init(db *pgxpool.Pool) *chi.Mux {
 			r.Route("/{slug}", func(r chi.Router) {
 				r.Get("/details", h.ForumGetBySlug)
 				r.Get("/users", h.ForumGetUsers)
+				r.Get("/threads", h.ForumGetThreads)
 				r.Post("/create", h.ThreadCreate)
+
+			})
+		})
+
+		r.Route("/thread", func(r chi.Router) {
+			r.Route("/{slug}", func(r chi.Router) {
+				r.Get("/details", h.ThreadGet)	
+				r.Post("/details", h.ThreadUpdate)
+				r.Post("/create", h.PostsCreate)
+				r.Post("/vote", h.ThreadVote)
+				r.Get("/posts", h.PostsGetSorted)
+			})
+		})
+
+		r.Route("/post", func(r chi.Router) {
+			r.Route("/{id}", func(r chi.Router) {
+				r.Post("/details", h.PostUpdate)
+				r.Get("/details", h.PostGetFull)
 			})
 		})
 

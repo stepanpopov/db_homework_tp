@@ -9,7 +9,7 @@ import (
 
 const (
 	// maxIdleConns = 10
-	maxOpenConns = 100
+	maxOpenConns = 10
 )
 
 func InitPostgresDB() (*pgxpool.Pool, error) {
