@@ -295,9 +295,10 @@ func (r Repo) ForumGetThreads(forumSlug string, sinceTime *time.Time, desc bool,
 	threads := make(models.Threads, 0)
 	for rows.Next() {
 		var thread models.Thread
+		var threadSLugNullable *string
 		rows.Scan(
 			&thread.ID,
-			&thread.Slug,
+			&threadSLugNullable,
 			&thread.Forum,
 			&thread.Author,
 			&thread.Title,
@@ -305,6 +306,10 @@ func (r Repo) ForumGetThreads(forumSlug string, sinceTime *time.Time, desc bool,
 			&thread.Votes,
 			&thread.Created,
 		)
+
+		if threadSLugNullable != nil {
+			thread.Slug = *threadSLugNullable
+		}
 
 		threads = append(threads, thread)
 	}
@@ -356,7 +361,7 @@ func (r Repo) ThreadCreate(thread models.Thread) (models.Thread, error) {
 	); err != nil {
 		pgErr := utils.PGErr(err)
 		if pgErr == models.ErrExists {
-
+			
 			con.QueryRow(ctx, fmt.Sprintf(`
 					SELECT id,
 						slug,
@@ -414,9 +419,10 @@ func (r Repo) ThreadGet(slugOrID string) (models.Thread, error) {
 		whereStatement,
 	)
 
+	var threadSLugNullable *string
 	if err := r.db.QueryRow(ctx, query).Scan(
 		&thread.ID,
-		&thread.Slug,
+		&threadSLugNullable,
 		&thread.Forum,
 		&thread.Author,
 		&thread.Title,
@@ -425,6 +431,10 @@ func (r Repo) ThreadGet(slugOrID string) (models.Thread, error) {
 		&thread.Created,
 	); err != nil {
 		return models.Thread{}, models.ErrNotFound
+	}
+
+	if threadSLugNullable != nil {
+		thread.Slug = *threadSLugNullable
 	}
 
 	return thread, nil
@@ -438,6 +448,7 @@ func (r Repo) ThreadUpdate(thr models.Thread) (models.Thread, error) {
 		whereStatement = fmt.Sprintf("id = %d", thr.ID)
 	}
 
+	var threadSLugNullable *string
 	var thread models.Thread
 	if err := r.db.QueryRow(ctx, fmt.Sprintf(`
 			UPDATE threads
@@ -450,7 +461,7 @@ func (r Repo) ThreadUpdate(thr models.Thread) (models.Thread, error) {
 		whereStatement),
 	).Scan(
 		&thread.ID,
-		&thread.Slug,
+		&threadSLugNullable,
 		&thread.Forum,
 		&thread.Author,
 		&thread.Title,
@@ -459,6 +470,10 @@ func (r Repo) ThreadUpdate(thr models.Thread) (models.Thread, error) {
 		&thread.Created,
 	); err != nil {
 		return models.Thread{}, err
+	}
+
+	if threadSLugNullable != nil {
+		thread.Slug = *threadSLugNullable
 	}
 
 	return thread, nil
@@ -491,9 +506,10 @@ func (r Repo) ThreadVote(slugOrID string, vote models.Vote) (models.Thread, erro
 		whereStatement,
 	)
 
+	var threadSLugNullable *string
 	if err := tx.QueryRow(ctx, query).Scan(
 		&thread.ID,
-		&thread.Slug,
+		&threadSLugNullable,
 		&thread.Forum,
 		&thread.Author,
 		&thread.Title,
@@ -502,6 +518,10 @@ func (r Repo) ThreadVote(slugOrID string, vote models.Vote) (models.Thread, erro
 	); err != nil {
 		tx.Commit(ctx)
 		return models.Thread{}, models.ErrNotFound
+	}
+
+	if threadSLugNullable != nil {
+		thread.Slug = *threadSLugNullable
 	}
 
 	if _, err := tx.Exec(ctx, fmt.Sprintf(`
@@ -913,10 +933,11 @@ func (r Repo) PostsGetFull(id int, related []string) (models.PostFullInfo, error
 				LIMIT 1`,
 				post.Thread,
 			)
+			var threadSLugNullable *string
 			var thread models.Thread
 			con.QueryRow(ctx, query).Scan(
 				&thread.ID,
-				&thread.Slug,
+				&threadSLugNullable,
 				&thread.Forum,
 				&thread.Author,
 				&thread.Title,
@@ -924,6 +945,9 @@ func (r Repo) PostsGetFull(id int, related []string) (models.PostFullInfo, error
 				&thread.Votes,
 				&thread.Created,
 			)
+			if threadSLugNullable != nil {
+				thread.Slug = *threadSLugNullable
+			}
 			postFull.Thread = &thread
 
 		case "user":
